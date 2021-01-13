@@ -21,8 +21,8 @@ from absl import flags
 from deepray.base.layers.cin import CompressedInteractionNetwork
 
 from deepray.base.layers.core import Linear
-from deepray.model.model_flen import FLENModel
-from deepray.model.model_fm import FactorizationMachine
+from deepray.model.RS.FLEN import FLENModel
+from deepray.model.RS.factorization_model import FactorizationMachine
 import tensorflow as tf
 
 FLAGS = flags.FLAGS

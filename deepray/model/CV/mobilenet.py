@@ -12,25 +12,17 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #  ==============================================================================
+import tensorflow as tf
+
+from deepray.model.model_classify import BaseClassifyModel
 
 
-"""
-Author:
-    Hailin Fu, hailinfufu@outlook.com
-"""
-
-from deepray.model.model_fm import FactorizationMachine
-
-
-class AttentionalFactorizationMachine(FactorizationMachine):
+class MobileNet(BaseClassifyModel):
     def build(self, input_shape):
-        self.fm_block = self.build_fm()
+        self.mobile = tf.keras.applications.MobileNetV2(input_shape=input_shape,
+                                                        include_top=False,
+                                                        weights='imagenet')
 
     def build_network(self, features, is_training=None):
-        """
-        TODO
-
-        :param features:
-        :param is_training:
-        :return:
-        """
+        logit = self.vgg(features)
+        return logit

@@ -131,26 +131,3 @@ class MultiHeadAttention(tf.keras.layers.Layer):
 
         return output, attention_weights
 
-
-class TransformerBlock(layers.Layer):
-    def __init__(self, embed_dim, num_heads, ff_dim, rate=0.1):
-        super(TransformerBlock, self).__init__()
-        self.att = MultiHeadAttention(embed_dim, num_heads)
-        self.ffn = self.point_wide_feed_forward_network(embed_dim, ff_dim)
-        self.layernorm1 = layers.LayerNormalization(epsilon=1e-6)
-        self.layernorm2 = layers.LayerNormalization(epsilon=1e-6)
-        self.dropout = layers.Dropout(rate)
-
-    def call(self, inputs, training):
-        attn_output, weight = self.att(inputs, inputs, inputs, mask=None)
-        attn_output = self.dropout(attn_output, training=training)
-        out1 = self.layernorm1(inputs + attn_output)
-        ffn_output = self.ffn(out1)
-        ffn_output = self.dropout(ffn_output, training=training)
-        return self.layernorm2(out1 + ffn_output)
-
-    def point_wide_feed_forward_network(self, d_model, dff):
-        return tf.keras.Sequential([
-            tf.keras.layers.Dense(dff, activation='relu'),
-            tf.keras.layers.Dense(d_model)
-        ])

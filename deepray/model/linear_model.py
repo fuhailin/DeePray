@@ -12,24 +12,21 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #  ==============================================================================
-
-
 """
 Author:
     Hailin Fu, hailinfufu@outlook.com
 """
-
-import tensorflow as tf
-
-from deepray.model.model_fm import FactorizationMachine
+from deepray.base.layers.core import Linear
+from deepray.model.classify_model import BaseClassifyModel
 
 
-class DeepFM(FactorizationMachine):
+class LogisitcRegression(BaseClassifyModel):
+
+    def __init__(self, flags):
+        super().__init__(flags)
 
     def build(self, input_shape):
-        hidden = [int(h) for h in self.flags.deep_layers.split(',')]
-        self.deep_block = self.build_deep(hidden=hidden)
-        self.fm_block = self.build_fm()
+        self.linear_block = self.build_linear()
 
     def build_network(self, features, is_training=None):
         """
@@ -38,7 +35,8 @@ class DeepFM(FactorizationMachine):
         :param is_training:
         :return:
         """
-        fm_out = self.fm_block(features)
-        deep_out = self.deep_block(features)
-        logit = tf.concat([deep_out, fm_out], -1)
-        return logit
+        linear_logit = self.linear_block(features)
+        return linear_logit
+
+    def build_linear(self, hidden=1):
+        return Linear(hidden)

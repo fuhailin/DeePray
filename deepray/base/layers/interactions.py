@@ -49,6 +49,15 @@ class FMNet(tf.keras.layers.Layer):
         logit = tf.add(linear_terms, pair_interactions)
         return logit
 
+    def get_config(self):
+        config = super(FMNet, self).get_config()
+        config.update({"k": self.k})
+        return config
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)
+
 
 class CrossBlock(tf.keras.layers.Layer):
     def __init__(self, block_name, use_bias, sparse, flags):
@@ -71,14 +80,6 @@ class CrossBlock(tf.keras.layers.Layer):
 
     def call(self, x0, x, is_training=None):
         outputs = self.kernel(x)
-        if self.flags.summary_mode == 'all':
-            for weight in tf.compat.v1.get_collection(
-                    tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES,
-                    scope=self.kernel.scope_name):
-                tf.summary.histogram(
-                    "normal/{}".format(weight.name), weight)
-                nnz = tf.math.count_nonzero(weight)
-                tf.summary.scalar('nnz/{}'.format(weight.name), nnz)
         return outputs * x0
 
 
@@ -99,8 +100,6 @@ class CrossNet(tf.keras.layers.Layer):
         t = inputs
         for i in range(self.num_layers):
             t += self.kernel[i](inputs, t, is_training=is_training)
-        if self.flags.summary_mode == 'all':
-            tf.summary.histogram(t.name, t)
         return t
 
 

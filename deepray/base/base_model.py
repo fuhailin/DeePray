@@ -29,7 +29,7 @@ flags.DEFINE_bool("res_deep", False, "residual connections for deep")
 flags.DEFINE_bool("renorm", False, "renorm in BN")
 flags.DEFINE_float("l1", 0.1, "l1 regularization")
 flags.DEFINE_float("l2", 0.1, "l2 regularization")
-flags.DEFINE_float("keep_prob", 1.0, "keep prob for dropout")
+flags.DEFINE_float("dropout_rate", 0.0, "dropout rate")
 flags.DEFINE_float("learning_rate", 0.0001, "learning rate")
 flags.DEFINE_integer("embedding_size", 50, "embedding size")
 flags.DEFINE_integer("emb_size_factor", 6, "emb size is "
@@ -57,7 +57,7 @@ class BaseModel(tf.keras.models.Model):
         return tf.concat(inputs, -1)
 
     def build_deep(self, hidden=None, activation=tf.nn.relu):
-        return DeepNet(hidden, activation, sparse=False, droprate=1 - self.flags.keep_prob, flags=self.flags)
+        return DeepNet(hidden, activation, sparse=False, droprate=1 - self.flags.dropout_rate, flags=self.flags)
 
     def build_dense_layer(self, fv):
         if self.flags.use_bn:
@@ -75,3 +75,17 @@ class BaseModel(tf.keras.models.Model):
                 activation=tf.nn.softmax,
                 name=PREDICT_LAYER_NAME + "/Softmax")
         return prediction
+
+    # def scale_fn(self, x):
+    #     condition = tf.greater_equal(x, 0)
+    #     x = tf.where(condition, tf.math.log(x + tf.math.exp(tf.constant(1.0))), x)
+    #     return x
+
+    def scale_fn(self, x):
+        x = tf.dtypes.cast(x, tf.float32)
+        condition = tf.greater_equal(x, 0)
+        x = tf.where(condition, tf.math.log1p(x), x)
+        return x
+
+    def _mylog(self, r):
+        return tf.math.log(tf.math.maximum(r, tf.constant(1e-18)))

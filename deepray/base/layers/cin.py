@@ -39,7 +39,7 @@ class CompressedInteractionNetwork(tf.keras.layers.Layer):
             self.filters.append(
                 self.add_weight(name='filter_{}'.format(i), shape=[1, self.field_nums[-1] * self.field_nums[0], size],
                                 dtype=tf.float32,
-                                initializer=glorot_uniform(seed=self.seed),
+                                initializer=glorot_uniform(seed=self.seed + i),
                                 regularizer=l2(self.l2_reg)))
             self.bias.append(self.add_weight(name='bias_{}'.format(i), shape=[size], dtype=tf.float32,
                                              initializer='zeros'))

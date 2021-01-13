@@ -12,42 +12,35 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #  ==============================================================================
-"""
-Author:
-    Hailin Fu, hailinfufu@outlook.com
-"""
+
 import tensorflow as tf
 from absl import flags
 
-from deepray.base.layers.interactions import FMNet
-from deepray.model.model_ctr import BaseCTRModel
+flags.DEFINE_enum("VGGNetCore", "VGG16",
+                  ["VGG16", "VGG19"],
+                  "VGGNet type")
 
-FLAGS = flags.FLAGS
-flags.DEFINE_integer("fm_order", 2, "FM net polynomial order")
-flags.DEFINE_integer("fm_rank", 2,
-                     "Number of factors in low-rank appoximation.")
-flags.DEFINE_integer("latent_factors", 10,
-                     "Size of factors in low-rank appoximation.")
+from deepray.model.model_classify import BaseClassifyModel
 
 
-class FactorizationMachine(BaseCTRModel):
-
+class VGGNet(BaseClassifyModel):
     def __init__(self, flags):
         super().__init__(flags)
-        self.k = tf.constant(self.flags.latent_factors)
 
     def build(self, input_shape):
-        self.fm_block = self.build_fm()
+        vgg = self.build_vggnet(self.flags.VGGNetCore)
+        self.vgg = vgg(input_shape=input_shape,
+                       include_top=False,
+                       weights='imagenet')
 
     def build_network(self, features, is_training=None):
-        """
-
-        :param features:
-        :param is_training:
-        :return:
-        """
-        logit = self.fm_block(features)
+        logit = self.vgg(features)
         return logit
 
-    def build_fm(self):
-        return FMNet(k=self.k)
+    def build_vggnet(self, core):
+        if core == 'ResNet50':
+            return tf.keras.applications.ResNet50
+        elif core == 'ResNet101':
+            return tf.keras.applications.ResNet101
+        else:
+            raise ValueError('--ResNetCore {} was not found.'.format(self.flags.ResNetCore))

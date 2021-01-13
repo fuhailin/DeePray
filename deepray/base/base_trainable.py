@@ -36,7 +36,7 @@ TIME_STAMP = datetime.now().strftime("%Y%m%d-%H%M%S")
 flags.DEFINE_bool("gzip", False, 'tfrecord file is gzip or not')
 flags.DEFINE_bool("lr_schedule", False, 'lr_schedule')
 flags.DEFINE_enum("optimizer", "lazyadam",
-                  ["adam", "adagrad", "adadelta", "lazyadam", "sgd", "RMSprop", "ftrl"],
+                  ["adam", "adagrad", "adadelta", "lazyadam", "sgd", "RMSprop", "ftrl", "AdamW"],
                   "optimizer type")
 flags.DEFINE_integer("patient_valid_passes", None,
                      "number of valid passes before early stopping")
@@ -52,6 +52,7 @@ flags.DEFINE_integer("epochs", 1, "number of training epochs")
 flags.DEFINE_integer("parallel_parse", 8, "Number of parallel parsing")
 flags.DEFINE_integer("shuffle_buffer", 512, "Size of shuffle buffer")
 flags.DEFINE_integer("prefetch_buffer", 4096, "Size of prefetch buffer")
+flags.DEFINE_integer("random_seed", 42, "random seed")
 
 LR_SCHEDULE = [
     # (epoch to start, learning rate) tuples
@@ -62,7 +63,7 @@ LR_SCHEDULE = [
 class BaseTrainable(object):
     def __init__(self, flags):
         super().__init__(flags)
-        self.seed_everything()
+        self.seed_everything(self.flags.random_seed)
         if not os.path.exists(flags.summaries_dir):
             os.makedirs(flags.summaries_dir)
         logging.get_absl_handler().use_absl_log_file(
@@ -77,12 +78,8 @@ class BaseTrainable(object):
         for key, value in sorted(self.flags.flag_values_dict().items()):
             logging.info('\t{:25}= {}'.format(key, value))
 
-        self.batch_size = self.flags.batch_size
-        self.max_patient_passes = self.flags.patient_valid_passes
         self.LABEL, self.CATEGORY_FEATURES, self.NUMERICAL_FEATURES, \
-        self.VOC_SIZE, self.VARIABLE_FEATURES = self.get_summary()
-        self.metrics_object = self.build_metrics()
-        self.loss_object = self.build_loss()
+        self.VOC_SIZE, self.VARIABLE_FEATURES, self.COL_NAMES = self.get_summary()
 
     def seed_everything(self, seed=10):
         tf.random.set_seed(seed)
@@ -104,47 +101,40 @@ class BaseTrainable(object):
     def build_metrics(self):
         metrics = []
         if self.VOC_SIZE[self.LABEL] == 2:
-            metrics.append(tf.keras.metrics.AUC())
+            metrics.append(tf.keras.metrics.AUC(curve='ROC', name='roc'))
+            metrics.append(tf.keras.metrics.AUC(curve='PR', name='pr'))
             metrics.append(tf.keras.metrics.BinaryAccuracy())
         else:
+            metrics.append(tf.keras.metrics.AUC(curve='ROC', name='roc', multi_label=True))
+            metrics.append(tf.keras.metrics.AUC(curve='PR', name='pr', multi_label=True))
             metrics.append(tf.keras.metrics.SparseCategoricalAccuracy())
         return metrics
 
     @classmethod
-    def parser(cls, record):
+    def build_data_iterator(cls, files, batch_size, epochs, shuffle=True):
         raise NotImplementedError(
-            "parser(called by tfrecord_pipeline): not implemented!")
+            "data_iterator(called by create_train_data_iterator): not implemented!")
 
-    @classmethod
-    def tfrecord_pipeline(cls, tfrecord_files, batch_size,
-                          epochs, shuffle=True):
-        flags = FLAGS
-        dataset = tf.data.TFRecordDataset(
-            [tfrecord_files],
-            compression_type='GZIP' if flags.gzip else None) \
-            .map(cls.parser,
-                 num_parallel_calls=tf.data.experimental.AUTOTUNE if flags.parallel_parse is None else flags.parallel_parse)
-        if shuffle:
-            dataset = dataset.shuffle(buffer_size=flags.shuffle_buffer)
-        dataset = dataset.repeat(epochs) \
-            .batch(batch_size) \
-            .prefetch(buffer_size=flags.prefetch_buffer)
-        return dataset
+    # @classmethod
+    # def read_list_from_file(cls, filename):
+    #     if not os.path.isfile(filename):
+    #         raise ValueError('{} should be a text file'.format(filename))
+    #     with open(filename) as f:
+    #         record_files = [path.strip() for path in f]
+    #         return record_files
 
     def create_train_data_iterator(self):
-        self.train_iterator = self.tfrecord_pipeline(
-            self.flags.train_data, self.flags.batch_size, epochs=1
-        )
-        self.valid_iterator = self.tfrecord_pipeline(
-            self.flags.valid_data, self.flags.batch_size, epochs=1, shuffle=False
-        )
+        # train_data = self.read_list_from_file(self.flags.train_data)
+        # valid_data = self.read_list_from_file(self.flags.valid_data)
+        self.train_iterator = self.build_data_iterator(self.flags.train_data,
+                                                       self.flags.batch_size,
+                                                       epochs=self.flags.epochs, shuffle=False)
+        self.valid_iterator = self.build_data_iterator(self.flags.valid_data,
+                                                       self.flags.batch_size,
+                                                       epochs=1,
+                                                       shuffle=False)
 
-    def train(self, model):
-        self.create_train_data_iterator()
-        optimizer = self.build_optimizer()
-        model.compile(optimizer=optimizer,
-                      loss=self.loss_object,
-                      metrics=self.metrics_object)
+    def build_callbacks(self):
         callbacks = [
             tf.keras.callbacks.TensorBoard(log_dir=self.flags.summaries_dir),
             CSVLogger(self.flags.summaries_dir + '/log.csv', append=True, separator=','),
@@ -170,12 +160,43 @@ class BaseTrainable(object):
             callbacks.append(cp_callback)
         if self.flags.lr_schedule:
             callbacks.append(LearningRateScheduler(self.lr_schedule))
-        history = model.fit(self.train_iterator, validation_data=self.valid_iterator,
-                            epochs=self.flags.epochs, callbacks=callbacks)
-        return history
+        return callbacks
 
-    def _mylog(self, r):
-        return tf.math.log(tf.math.maximum(r, tf.constant(1e-18)))
+    def run(self, model):
+        self.create_train_data_iterator()
+        metrics_object = self.build_metrics()
+        loss_object = self.build_loss()
+        optimizer_object = self.build_optimizer()
+        # for features, labels in self.train_iterator:
+        #     for key, value in features.items():
+        #         if isinstance(value, tf.sparse.SparseTensor):
+        #             test = tf.sparse.to_dense(value)
+        #             test1 = test.numpy()
+        #             print(key, test)
+        #         else:
+        #             print(key, value)
+        #     print('\n')
+        #     with tf.GradientTape() as tape:
+        #         predictions = model(features, training=True)
+        #         loss = loss_object(labels, predictions)
+        #     gradients = tape.gradient(loss, model.trainable_variables)
+        #     optimizer_object.apply_gradients(zip(gradients, model.trainable_variables))
+        model.compile(optimizer=optimizer_object,
+                      loss=loss_object,
+                      metrics=metrics_object)
+
+
+        callbacks_object = None#self.build_callbacks()
+        # import tempfile
+        # model_dir = tempfile.mkdtemp()
+        # keras_estimator = tf.keras.estimator.model_to_estimator(
+        #     keras_model=model, model_dir=model_dir)
+        # keras_estimator.train(input_fn=self.train_iterator, steps=500)
+        # eval_result = keras_estimator.evaluate(input_fn=self.valid_iterator, steps=10)
+        # print('Eval result: {}'.format(eval_result))
+        history = model.fit(self.train_iterator, validation_data=self.valid_iterator,
+                            epochs=self.flags.epochs, callbacks=callbacks_object)
+        return history
 
     def build_optimizer(self):
         if self.flags.optimizer == "adam":
@@ -192,6 +213,8 @@ class BaseTrainable(object):
             optimizer = tf.keras.optimizers.SGD
         elif self.flags.optimizer == "RMSprop":
             optimizer = tf.keras.optimizers.RMSprop
+        elif self.flags.optimizer == "AdamW":
+            optimizer = tfa.optimizers.AdamW
         else:
             raise ValueError('--optimizer {} was not found.'.format(self.flags.optimizer))
         return optimizer(learning_rate=self.flags.learning_rate)

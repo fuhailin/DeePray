@@ -20,52 +20,56 @@ Author:
 """
 from absl import flags
 
-from deepray.model import model_lr
+from deepray.model import linear_model
 
 flags.DEFINE_string("model", "lr", "model")
 
 
 def BuildModel(flags):
     if flags.model == 'lr':
-        model = model_lr.LogisitcRegression(flags)
+        model = linear_model.LogisitcRegression(flags)
     elif flags.model == 'fm':
-        from deepray.model import model_fm
-        model = model_fm.FactorizationMachine(flags)
+        from deepray.model.RS import factorization_model
+        model = factorization_model.FactorizationMachine(flags)
     elif flags.model == 'ffm':
-        from deepray.model import model_ffm
-        model = model_ffm.FactorizationMachine(flags)
+        from deepray.model.RS import factorization_model
+        model = factorization_model.FieldawareFactorizationMachine(flags)
     elif flags.model == 'nfm':
-        from deepray.model import model_nfm
-        model = model_nfm.NeuralFactorizationMachine(flags)
+        from deepray.model.RS import factorization_model
+        model = factorization_model.NeuralFactorizationMachine(flags)
     elif flags.model == 'afm':
-        from deepray.model import model_afm
-        model = model_afm.AttentionalFactorizationMachine(flags)
+        from deepray.model.RS import factorization_model
+        model = factorization_model.AttentionalFactorizationMachine(flags)
     elif flags.model == 'deepfm':
-        from deepray.model import model_deepfm
-        model = model_deepfm.DeepFM(flags)
+        from deepray.model.RS import factorization_model
+        model = factorization_model.DeepFM(flags)
     elif flags.model == 'xdeepfm':
-        from deepray.model import model_xdeepfm
-        model = model_xdeepfm.ExtremeDeepFMModel(flags)
+        from deepray.model.RS import xDeepFM
+        model = xDeepFM.ExtremeDeepFMModel(flags)
     elif flags.model == 'wdl':
-        from deepray.model import model_wdl
-        model = model_wdl.WideAndDeepModel(flags)
+        from deepray.model.RS import WDL
+        model = WDL.WideDeepModel(flags)
     elif flags.model == 'dcn':
-        from deepray.model import model_dcn
-        model = model_dcn.DeepCrossModel(flags)
-    elif flags.model == 'din':
-        from deepray.model import model_din
-        model = model_din.DeepInterestNetwork(flags)
-    elif flags.model == 'dien':
-        from deepray.model import model_dien
-        model = model_dien.DeepInterestEvolutionNetwork(flags)
-    elif flags.model == 'flen':
-        from deepray.model import model_flen
-        model = model_flen.FLENModel(flags)
+        from deepray.model.RS import DCN
+        model = DCN.DeepCrossModel(flags)
     elif flags.model == 'autoint':
-        from deepray.model import model_autoint
-        model = model_autoint.AutoIntModel(flags)
+        from deepray.model.RS import attention_model
+        model = attention_model.AutoIntModel(flags)
+    elif flags.model == 'din':
+        from deepray.model.RS import attention_model
+        model = attention_model.DeepInterestNetwork(flags)
+    elif flags.model == 'dien':
+        from deepray.model.RS import attention_model
+        model = attention_model.DeepInterestEvolutionNetwork
+    elif flags.model == 'dsin':
+        from deepray.model.RS import attention_model
+        model = attention_model.DeepSessionInterestNetwork(flags)
+    elif flags.model == 'flen':
+        from deepray.model.RS import FLEN
+        model = FLEN.FLENModel(flags)
+
     elif flags.model == 'lstm':
-        from deepray.model import model_lstm
+        from deepray.model.NLP import model_lstm
         model = model_lstm.CustomModel(flags)
     else:
         raise ValueError('--model {} was not found.'.format(flags.model))

@@ -37,11 +37,12 @@ flags.DEFINE_enum(
     "the squares of the weights.")
 
 
-class BaseCTRModel(CustomTrainable, BaseModel):
+class BaseClassifyModel(CustomTrainable, BaseModel):
     def __init__(self, flags):
         super().__init__(flags)
-        BaseCTRModel.voc_emb_size = self.load_voc_summary()
-        self.EmbeddingDict = self.build_EmbeddingDict()
+        BaseClassifyModel.voc_emb_size = self.load_voc_summary()
+        # self.EmbeddingDict = self.build_EmbeddingDict()
+        self.input_layer = self.build_feature_columns()
         self.predict_layer = self.build_predictions()
 
     def build_EmbeddingDict(self):
@@ -64,9 +65,44 @@ class BaseCTRModel(CustomTrainable, BaseModel):
                 self.EmbeddingDict[key](features[key],
                                         combiner=self.flags.sparse_embedding_combiner))
 
-        fv_list = [self.build_dense_layer(features[key]) for key in self.NUMERICAL_FEATURES]
+        fv_list = [self.build_dense_layer(tf.reshape(
+            features[key],
+            [-1, 1])) for key in self.NUMERICAL_FEATURES]
         inputs = self.concat(fv_list + ev_list + sparse_ev_list)
         return inputs
+
+    def build_feature_columns(self):
+        numberical_columns = [tf.feature_column.numeric_column(
+            feat,
+            default_value=0,
+            dtype=tf.dtypes.float32,
+            normalizer_fn=self.scale_fn) for feat in self.NUMERICAL_FEATURES]
+
+        categorical_columns = []
+        for feat in self.CATEGORY_FEATURES:
+            cat_col = tf.feature_column.categorical_column_with_hash_bucket(
+                key=feat, hash_bucket_size=self.voc_emb_size[feat][0], dtype=tf.string)
+            categorical_columns.append(tf.feature_column.embedding_column(cat_col, self.voc_emb_size[feat][1]))
+
+        variable_columns = []
+        for feat in self.VARIABLE_FEATURES:
+            id_feature = tf.feature_column.sequence_categorical_column_with_hash_bucket(
+                key=feat,
+                hash_bucket_size=self.voc_emb_size[feat][0],
+                # combiner='mean',
+                dtype=tf.string,
+            )
+            emb_col = tf.feature_column.embedding_column(
+                id_feature,
+                dimension=self.voc_emb_size[feat][1],
+                combiner='mean'
+            )
+            # ind_col = tf.feature_column.indicator_column(id_feature)
+            variable_columns.append(emb_col)
+        # input2 = tf.keras.experimental.SequenceFeatures(variable_columns)
+
+        inputs = numberical_columns + categorical_columns
+        return tf.keras.layers.DenseFeatures(inputs)
 
     @classmethod
     def compute_emb_size(cls, voc_size):
@@ -76,12 +112,6 @@ class BaseCTRModel(CustomTrainable, BaseModel):
     def print_emb_info(cls, feature_name, voc_size, emb_size):
         logging.info(" voc_size{:8} emb_size{:4} feature_name {}".format(
             voc_size, emb_size, feature_name))
-
-    @classmethod
-    def tfrecord_pipeline(cls, tfrecord_file, batch_size,
-                          epochs, shuffle=True):
-        return CustomTrainable.tfrecord_pipeline(tfrecord_file, batch_size,
-                                                 epochs, shuffle)
 
     def reshape_input(self, features):
         reshaped = dict()
@@ -98,7 +128,7 @@ class BaseCTRModel(CustomTrainable, BaseModel):
         voc_emb_size = dict()
         for key, voc_size in self.VOC_SIZE.items():
             emb_size = self.compute_emb_size(voc_size)
-            voc_emb_size[key] = [voc_size + 1, emb_size]
+            voc_emb_size[key] = [voc_size, emb_size]
         for k, v in voc_emb_size.items():
             if k == self.LABEL:
                 continue
@@ -106,7 +136,8 @@ class BaseCTRModel(CustomTrainable, BaseModel):
         return voc_emb_size
 
     def call(self, inputs, is_training=None, mask=None):
-        features = self.build_features(inputs)
+        # features = self.build_features(inputs)
+        features = self.input_layer(inputs)
         logit = self.build_network(features, is_training)
         preds = self.predict_layer(logit)
         return preds

@@ -12,21 +12,20 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #  ==============================================================================
-"""
-Author:
-    Hailin Fu, hailinfufu@outlook.com
-"""
-from deepray.model.model_ctr import BaseCTRModel
+import tensorflow as tf
+
+from deepray.model.model_classify import BaseClassifyModel
 
 
-class ProductNeuralNetwork(BaseCTRModel):
-    def __init__(self):
-        super(ProductNeuralNetwork, self).__init__()
+class LeNet(BaseClassifyModel):
+    def build(self, input_shape):
+        pass
+        '''
+        self.mobile = tf.keras.applications.(input_shape=input_shape,
+                                                        include_top=False,
+                                                        weights='imagenet')
+        '''
 
     def build_network(self, features, is_training=None):
-        """
-
-        :param features:
-        :param is_training:
-        :return:
-        """
+        logit = self.vgg(features)
+        return logit

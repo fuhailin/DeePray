@@ -12,24 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #  ==============================================================================
-
-
-"""
-Author:
-    Hailin Fu, hailinfufu@outlook.com
-"""
-from deepray.model.model_ctr import BaseCTRModel
-
-
-class DeepSessionInterestNetwork(BaseCTRModel):
-    def __init__(self):
-        super(DeepSessionInterestNetwork, self).__init__()
-
-    def build_network(self, features, is_training=None):
-        """
-        TODO
-
-        :param features:
-        :param is_training:
-        :return:
-        """
+'''
+https://github.com/Machine-Learning-Tokyo/CNN-Architectures
+'''

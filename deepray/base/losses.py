@@ -38,3 +38,6 @@ class WeightedBinaryCrossEntropy(tf.keras.losses.Loss):
             y_true, y_pred, from_logits=self.from_logits)[:, None]
         ce = self.weight * (ce * (1 - y_true) + self.pos_weight * ce * (y_true))
         return ce
+
+
+class

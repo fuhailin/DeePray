@@ -12,7 +12,6 @@ import sys
 
 from absl import app, flags
 
-import deepray as dp
 from deepray.base.trainer import train
 from deepray.model.build_model import BuildModel
 
@@ -32,10 +31,10 @@ def runner(argv=None):
     if len(argv) <= 1:
         argv = [
             sys.argv[0],
-            '--model=lr',
+            '--model=fm',
             '--optimizer=lazyadam',
-            '--train_data=/Users/vincent/Projects/DeePray/examples/census/data/train',
-            '--valid_data=/Users/vincent/Projects/DeePray/examples/census/data/valid',
+            '--train_data=/Users/vincent/Projects/DeePray/examples/census/data/train.tfrecord.gzip',
+            '--valid_data=/Users/vincent/Projects/DeePray/examples/census/data/valid.tfrecord.gzip',
             '--feature_map=/Users/vincent/Projects/DeePray/examples/census/data/feature_map.csv',
             '--learning_rate=0.01',
             '--epochs=5',

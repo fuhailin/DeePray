@@ -7,7 +7,7 @@
 
 ## Introduction
 The DeePray library offers state-of-the-art algorithms for [deep learning recommendation].
-DeePray is built on latest [TensorFlow 2][(https://tensorflow.org/)] and designed with modular structure，
+DeePray is built on latest [TensorFlow 2][(https://tensorflow.org/)] and designed with modular structure, 
 making it easy to discover patterns and answer questions about tabular-structed data.
 
 The main goals of DeePray:

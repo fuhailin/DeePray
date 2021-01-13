@@ -73,8 +73,9 @@ class DeepNet(tf.keras.layers.Layer):
         self.flags = flags
 
     def build(self, input_shape):
-        self.kernel = [DeepBlock(hs, self.activation, 'deep_{}'.format(i),
-                                 self.sparse, self.flags) for i, hs in enumerate(self.hidden)]
+        # self.kernel = [DeepBlock(hs, self.activation, 'deep_{}'.format(i),
+        #                          self.sparse, self.flags) for i, hs in enumerate(self.hidden)]
+        self.kernel = [tf.keras.layers.Dense(units=hs, activation=self.activation) for i, hs in enumerate(self.hidden)]
 
     def call(self, x, is_training=None):
         for i, hs in enumerate(self.hidden):
@@ -84,6 +85,12 @@ class DeepNet(tf.keras.layers.Layer):
             x = CustomDropout(rate=self.droprate)(x, is_training=is_training)
             x = self.kernel[i](x, is_training=is_training)
         return x
+
+    def get_config(self):
+        config = super(DeepNet, self).get_config()
+        config.update({"hidden": self.hidden})
+        config.update({"activation": self.activation})
+        return config
 
 
 class Linear(tf.keras.layers.Layer):
